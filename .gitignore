@@ -1,0 +1,6 @@
+# Configuration locale de build (jamais versionnée)
+*.local
+
+# Divers
+.DS_Store
+*.log
