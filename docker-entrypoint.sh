@@ -18,7 +18,12 @@
 #   JANUS_RTP_PORT_RANGE  Plage UDP média. Défaut : 20000-20100.
 #   JANUS_STUN_SERVER   Serveur STUN : active la DÉTECTION AUTOMATIQUE de l'IP
 #                       publique. C'est la voie recommandée — voir plus bas.
-#   JANUS_STUN_PORT     Port du serveur STUN (défaut : 3478).
+#                       DOIT être joignable depuis Internet : un STUN local
+#                       (sur le même réseau) renvoie l'adresse PRIVÉE et la
+#                       détection ne sert à rien. Un nom d'hôte est accepté
+#                       et résolu en IPv4 (voir section 4).
+#   JANUS_STUN_PORT     Port du serveur STUN (défaut : 3478 ; 19302 pour
+#                       stun.l.google.com).
 set -e
 
 CFG=/opt/janus/etc/janus/janus.jcfg
@@ -69,6 +74,33 @@ fi
 # ---------------------------------------------------------------------------
 if [ -n "${JANUS_STUN_SERVER:-}" ]; then
     STUN_PORT="${JANUS_STUN_PORT:-3478}"
+
+    # RÉSOLUTION EN IPv4 — INDISPENSABLE.
+    #
+    # Janus accepte un nom d'hôte ici, mais il le résout via getaddrinfo, qui
+    # rend l'IPv6 EN PREMIER sur une machine double-pile. Janus n'interroge
+    # alors le STUN qu'en IPv6 et annonce une adresse IPv6 publique — mesuré :
+    #   >> Our public address is 2a01:e0a:ff3:7830:be24:11ff:fe52:3cea
+    # Résultat : les navigateurs qui n'ont que l'IPv4 ne reçoivent aucun
+    # candidat joignable et le média ne passe pas.
+    #
+    # On fige donc l'IPv4 ici. Le nom d'hôte reste accepté en entrée ; seule
+    # l'adresse écrite dans la configuration est une IPv4 littérale.
+    case "${JANUS_STUN_SERVER}" in
+        *[!0-9.]*)
+            # Ce n'est pas une IPv4 littérale : on résout.
+            STUN_IP4="$(getent ahostsv4 "${JANUS_STUN_SERVER}" 2>/dev/null | awk 'NR==1{print $1}')"
+            if [ -n "$STUN_IP4" ]; then
+                echo "janus: ${JANUS_STUN_SERVER} résolu en IPv4 = ${STUN_IP4}"
+                JANUS_STUN_SERVER="$STUN_IP4"
+            else
+                echo "janus: AVERTISSEMENT — ${JANUS_STUN_SERVER} ne résout pas en IPv4." >&2
+                echo "janus: la détection STUN risque d'annoncer une adresse IPv6" >&2
+                echo "janus: et de rendre le média injoignable. Préférer une IPv4." >&2
+            fi
+            ;;
+    esac
+
     if grep -qE "^[[:space:]]*stun_server" "$CFG"; then
         sed -i "s|^[[:space:]]*stun_server.*|stun_server = \"${JANUS_STUN_SERVER}\"|" "$CFG"
     else
