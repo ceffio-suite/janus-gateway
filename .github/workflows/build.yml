@@ -14,9 +14,9 @@ name: build
 on:
   push:
     branches: [main, develop]
+    tags: ['v*']
   pull_request:
     branches: [main, develop]
-  tags: ['v*']
   workflow_dispatch:
 
 env:
