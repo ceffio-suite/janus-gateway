@@ -53,21 +53,35 @@ jobs:
           TAG="${{ steps.tag.outputs.tag }}"
           SHA="$(git rev-list -n 1 "$TAG")"
           DEADLINE=$(( $(date +%s) + 1800 ))
+          # We look for the NEWEST build run on this commit that is still in
+          # progress or already green — not for "no run is red". A tag placed
+          # on an older commit can carry a stale failed run from a previous
+          # attempt; requiring every run to be green would then loop for the
+          # full 30 minutes and give up, even though the image is fine.
           while :; do
-            gh run list --workflow build.yml --commit "$SHA" \
-              --json databaseId,status,conclusion \
-              --jq '.[] | "\(.databaseId) :: \(.status) :: \(.conclusion)"' > /tmp/runs.txt || true
-            if [ -s /tmp/runs.txt ] && ! grep -qvE ' :: completed :: (success|skipped)$' /tmp/runs.txt; then
-              break
+            gh run list --workflow build.yml --commit "$SHA" --limit 20 \
+              --json databaseId,status,conclusion,createdAt \
+              --jq 'sort_by(.createdAt) | reverse | .[0] | "\(.databaseId) :: \(.status) :: \(.conclusion)"' \
+              > /tmp/run.txt 2>/dev/null || true
+            if [ ! -s /tmp/run.txt ] || [ "$(cat /tmp/run.txt)" = "null :: null :: null" ]; then
+              echo "::error::no build.yml run exists for $SHA — the tag points at a commit that was never built. Nothing is published."
+              exit 1
             fi
+            case "$(cat /tmp/run.txt)" in
+              *" :: completed :: success"*) break ;;
+              *" :: completed :: failure"*|*" :: completed :: cancelled"*)
+                echo "::error::the build of $SHA FAILED — nothing is published."
+                cat /tmp/run.txt
+                exit 1 ;;
+            esac
             if [ "$(date +%s)" -ge "$DEADLINE" ]; then
-              echo "::error::image build for $SHA is not green after 30 minutes — nothing is published."
-              cat /tmp/runs.txt || echo "(no build run found)"
+              echo "::error::image build for $SHA is still not green after 30 minutes — nothing is published."
+              cat /tmp/run.txt
               exit 1
             fi
             sleep 20
           done
-          cat /tmp/runs.txt
+          cat /tmp/run.txt
           echo "image build verified green on $SHA"
 
       - name: Prove the image is pullable, anonymously
