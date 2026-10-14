@@ -1,13 +1,13 @@
 name: build
 
-# Construit et publie l'image Janus pour Ceffio.
+# Builds and publishes the Janus image for Ceffio.
 #
-# Deux déclencheurs :
-#   - push sur main        → tag « latest » (non utilisé en production)
-#   - tag git (v1.3.0-*)   → tag versionné, celui que Ceffio épingle
+# Two triggers:
+#   - push on main        → "latest" tag (unused in production)
+#   - git tag (v1.3.0-*)  → versioned tag, the one Ceffio pins
 #
-# L'image cible linux/amd64 : la VM Ceffio (k3s) est en x86_64. GitHub Actions
-# fournit des runners amd64, donc aucun build cross-architecture n'est requis.
+# The image targets linux/amd64: the Ceffio VM (k3s) is x86_64. GitHub Actions
+# provides amd64 runners, so no cross-architecture build is required.
 
 on:
   push:
@@ -27,29 +27,29 @@ jobs:
       packages: write
 
     steps:
-      - name: Récupérer le dépôt
+      - name: Check out the repository
         uses: actions/checkout@v4
 
-      - name: Installer buildx
+      - name: Install buildx
         uses: docker/setup-buildx-action@v3
 
-      # On publie avec un token DÉDIÉ (secret GHCR_TOKEN) et non avec le
-      # GITHUB_TOKEN : la politique de l'organisation ceffio-suite impose des
-      # permissions en LECTURE au token automatique (« Write permissions for
-      # workflows are disabled by the organization »), ce qui ferait échouer le
-      # push de l'image en « permission_denied ».
+      # We publish with a DEDICATED token (GHCR_TOKEN secret) and not the
+      # GITHUB_TOKEN: the ceffio-suite organization policy imposes READ
+      # permissions on the automatic token ("Write permissions for workflows
+      # are disabled by the organization"), which would make the image push
+      # fail with "permission_denied".
       #
-      # On préfère un token dédié à un assouplissement de la politique d'org :
-      # la restriction du GITHUB_TOKEN est une bonne pratique, on ne l'affaiblit
-      # pas pour faire passer un build.
-      - name: Se connecter à GHCR
+      # We prefer a dedicated token over loosening the org policy: the
+      # GITHUB_TOKEN restriction is a good practice, we do not weaken it to
+      # make a build pass.
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Extraire les métadonnées (tags, labels)
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -60,7 +60,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Construire et pousser
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -68,14 +68,14 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Le build compile usrsctp, libsrtp et Janus depuis les sources :
-          # comptez une dizaine de minutes à froid.
+          # The build compiles usrsctp, libsrtp and Janus from source:
+          # allow about ten minutes cold.
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Récapitulatif
+      - name: Summary
         run: |
-          echo "### Image publiée" >> $GITHUB_STEP_SUMMARY
+          echo "### Published image" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
