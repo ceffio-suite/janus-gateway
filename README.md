@@ -28,7 +28,7 @@ This repository therefore produces a **published image**, with two guarantees:
 
 ## Image
 
-    ghcr.io/ceffio-suite/janus-gateway:1.3.0
+    ghcr.io/ceffio-suite/janus-gateway:1.4.3-1
 
 Targets `linux/amd64` (the Ceffio VM is x86_64).
 
@@ -97,9 +97,9 @@ cold, far less with cache.
 
 ## Publish a new version
 
-    git tag v1.3.0-1 && git push origin v1.3.0-1
+    git tag v1.4.3-1 && git push origin v1.4.3-1
 
-The workflow then publishes `ghcr.io/ceffio-suite/janus-gateway:1.3.0-1`.
+The workflow then publishes `ghcr.io/ceffio-suite/janus-gateway:1.4.3-1`.
 Ceffio pins this tag in its version registry — **never `latest`**: a tag that
 moves makes a deployment non-reproducible.
 
