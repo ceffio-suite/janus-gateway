@@ -14,9 +14,9 @@ name: build
 on:
   push:
     branches: [main, develop]
+    tags: ['v*']
   pull_request:
     branches: [main, develop]
-  tags: ['v*']
   workflow_dispatch:
 
 env:
@@ -69,7 +69,17 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
-          push: true
+          # PUSH ONLY WHEN THERE IS SOMETHING TO PUBLISH. On a pull request,
+          # none of the metadata rules matches: `type=ref,event=branch` does
+          # not fire on a PR, `semver` needs a tag, and `latest` is gated to
+          # the default branch. The tag list comes out empty and buildx fails
+          # with "tag is needed when pushing to registry" — which is what
+          # turned every PR red.
+          #
+          # Pushing from a PR would also be wrong on its own terms: an
+          # unreviewed commit would overwrite the image a production install
+          # pulls. A PR builds to prove it compiles; only main and tags publish.
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # The build compiles usrsctp, libsrtp and Janus from source:
