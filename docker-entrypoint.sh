@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © MANDEM
 # Janus entrypoint for Ceffio.
 #
 # Role: make Janus usable behind the firewall NAT, WITHOUT freezing the public

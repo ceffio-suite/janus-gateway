@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © MANDEM
 name: build
 
 # Builds and publishes the Janus image for Ceffio.
@@ -11,8 +13,10 @@ name: build
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  tags: ['v*']
   workflow_dispatch:
 
 env:

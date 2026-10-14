@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/ceffio-suite/janus-gateway/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/ceffio-suite/janus-gateway/build.yml?branch=main&label=build&logo=github" alt="build status"></a>
   <a href="https://github.com/ceffio-suite/janus-gateway/pkgs/container/janus-gateway"><img src="https://img.shields.io/badge/GHCR-janus--gateway-2496ED?logo=docker&logoColor=white" alt="GHCR image"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/ceffio-suite/janus-gateway?color=blue" alt="Apache-2.0 license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="AGPL-3.0-or-later license"></a>
 </p>
 
 # janus-gateway — Janus image for Ceffio
@@ -113,8 +113,20 @@ moves makes a deployment non-reproducible.
 
 ## License
 
-Janus Gateway is distributed under **GPL-3.0** (see the
-[meetecho/janus-gateway](https://github.com/meetecho/janus-gateway) repository).
+This repository is licensed **AGPL-3.0-or-later**, Copyright © MANDEM — the
+same license as the [Ceffio suite](https://github.com/ceffio-suite/ceffio) it
+serves. (An Apache-2.0 placeholder was committed before the suite-wide AGPL
+decision; this replaces it.)
 
-This repository only contains the build recipe and the configuration — not
-Janus's code, which is fetched from its official source at build time.
+What that covers, file by file:
+
+| Content | License | Why |
+|---|---|---|
+| `Dockerfile`, `docker-entrypoint.sh`, `.github/workflows/` | AGPL-3.0-or-later | Written by MANDEM; a build recipe and runtime script are not derivative works of Janus |
+| `janus*.jcfg` | GPL-3.0 (remain GPL, combined into this repo under AGPL-3.0 §13) | Derived from the `conf/*.jcfg.sample` files of the upstream GPL-3.0 Janus repository — verified by line-for-line comparison; Ceffio's adaptations stay under the upstream license |
+| Janus binary compiled into the image | GPL-3.0 | [meetecho/janus-gateway](https://github.com/meetecho/janus-gateway), fetched from the official tarball at build time |
+| usrsctp / libsrtp compiled into the image | BSD-3-Clause | [sctplab/usrsctp](https://github.com/sctplab/usrsctp), [cisco/libsrtp](https://github.com/cisco/libsrtp) |
+
+AGPL-3.0 §13 expressly permits combining GPL-3.0 covered works with AGPL
+works, so the repository, the image and the Ceffio suite are coherent: GPL
+config + AGPL scripts + GPL Janus binary, no relicensing of upstream code.
