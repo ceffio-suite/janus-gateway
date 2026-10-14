@@ -1,0 +1,113 @@
+name: Release
+
+# A release here = a Git tag AND a GitHub Release with generated notes.
+# The IMAGE itself is published by build.yml on the same tag (that is the real
+# artifact of this repo); this workflow attaches the human-facing release:
+# changelog, and a pointer to the exact image digest users must pull.
+#
+# WHY WAIT FOR THE IMAGE: a release announced before its image exists in the
+# registry is a trap — the first user pulls and gets "not found". This job
+# waits for build.yml's run on the same commit to go green before publishing.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re-)publish, e.g. v1.3.0"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: publish ${{ github.event.ref_name || inputs.tag }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Resolve the tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.tag }}" ]; then TAG="${{ inputs.tag }}"; else TAG="${GITHUB_REF#refs/tags/}"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if ! echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::tag '$TAG' is not valid: expected vMAJOR.MINOR.PATCH (suffix allowed)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Wait for the image build of the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          SHA="$(git rev-list -n 1 "$TAG")"
+          DEADLINE=$(( $(date +%s) + 1800 ))
+          while :; do
+            gh run list --workflow build.yml --commit "$SHA" \
+              --json databaseId,status,conclusion \
+              --jq '.[] | "\(.databaseId) :: \(.status) :: \(.conclusion)"' > /tmp/runs.txt || true
+            if [ -s /tmp/runs.txt ] && ! grep -qvE ' :: completed :: (success|skipped)$' /tmp/runs.txt; then
+              break
+            fi
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "::error::image build for $SHA is not green after 30 minutes — nothing is published."
+              cat /tmp/runs.txt || echo "(no build run found)"
+              exit 1
+            fi
+            sleep 20
+          done
+          cat /tmp/runs.txt
+          echo "image build verified green on $SHA"
+
+      - name: Prove the image is pullable, anonymously
+        # The README tells users to `docker pull` this image. "The build said
+        # pushed" is not proof it is pullable by someone else: a package can
+        # stay PRIVATE and the build still succeed. This step pulls with no
+        # credentials — exactly what a new user does.
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          docker pull --platform linux/amd64 "ghcr.io/ceffio-suite/janus-gateway:${VERSION}"
+          echo "anonymous pull of :${VERSION} succeeded"
+
+      - name: Write the release body
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          cat > RELEASE_BODY.md <<EOF
+          ## Image
+
+          \`\`\`
+          ghcr.io/ceffio-suite/janus-gateway:${VERSION}
+          \`\`\`
+
+          Pull it anonymously — the package is public. The anonymous-pull check
+          above ran as part of this release: what you see here was pullable
+          when it was published.
+
+          Pinned upstream versions, media range and NAT behaviour are
+          documented in the README of this tag.
+          EOF
+
+      - name: Create the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: janus-gateway ${{ steps.tag.outputs.tag }}
+          prerelease: ${{ contains(steps.tag.outputs.tag, '-') }}
+          generate_release_notes: true
+          body_path: RELEASE_BODY.md
+        env:
+          GH_TOKEN: ${{ github.token }}
