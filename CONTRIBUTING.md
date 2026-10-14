@@ -67,6 +67,9 @@ docker run --rm -e JANUS_DEBUG_LEVEL=4 janus-gateway:test
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE). The Janus software built by this
-image is GPL-3.0 (upstream); this repository contains only build recipes and
-configuration.
+AGPL-3.0-or-later, Copyright © MANDEM — see [LICENSE](LICENSE) and the
+License section of the README. By contributing you accept that your
+contribution is licensed the same way. The Janus software built by this image
+is GPL-3.0 (upstream), and the `janus*.jcfg` configuration files derive from
+its GPL-3.0 samples — they remain under GPL-3.0, combined here under AGPL-3.0
+§13.

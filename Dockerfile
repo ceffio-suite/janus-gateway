@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © MANDEM
 # Janus WebRTC Gateway — image for Ceffio (Talk High Performance Backend)
 #
 # Rebuilds the official nextcloud-spreed-signaling Dockerfile
