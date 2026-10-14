@@ -60,7 +60,7 @@ RUN cd /tmp \
 # ---------------------------------------------------------------------------
 # Janus Gateway
 # ---------------------------------------------------------------------------
-ARG JANUS_VERSION=1.3.0
+ARG JANUS_VERSION=1.4.3
 RUN mkdir -p /usr/src/janus \
  && cd /usr/src/janus \
  && curl -sL https://github.com/meetecho/janus-gateway/archive/refs/tags/v${JANUS_VERSION}.tar.gz | tar xz \
