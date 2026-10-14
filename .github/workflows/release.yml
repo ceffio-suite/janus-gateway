@@ -122,7 +122,14 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: janus-gateway ${{ steps.tag.outputs.tag }}
-          prerelease: ${{ contains(steps.tag.outputs.tag, '-') }}
+          # NOT "contains(tag, '-')": every tag in this repository carries a
+          # dash by convention — `1.4.3-1` means "Janus 1.4.3, image build 1",
+          # which is a NORMAL release, not a preview. That rule marked every
+          # release as Pre-release, which is misleading for the tag Ceffio
+          # pins in production.
+          #
+          # A pre-release is an explicit suffix: -rc, -beta, -alpha.
+          prerelease: ${{ contains(steps.tag.outputs.tag, '-rc') || contains(steps.tag.outputs.tag, '-beta') || contains(steps.tag.outputs.tag, '-alpha') }}
           generate_release_notes: true
           body_path: RELEASE_BODY.md
         env:
