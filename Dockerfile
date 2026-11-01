@@ -13,7 +13,7 @@
 # Reference source (to follow for updates):
 #   https://github.com/strukturag/nextcloud-spreed-signaling/blob/master/docker/janus/Dockerfile
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 # ---------------------------------------------------------------------------
 # Build dependencies
