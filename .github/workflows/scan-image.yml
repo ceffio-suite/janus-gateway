@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © MANDEM
+name: scan an image
+
+# A GATE THAT ONLY RUNS ON A RELEASE LEAVES THE PUBLISHED IMAGES UNCHECKED UNTIL
+# THE NEXT ONE. This workflow scans any reference on demand, with the suite's
+# rule: a CRITICAL finding that has a fix fails.
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Image reference to scan (e.g. ghcr.io/ceffio-suite/janus-gateway:1.4.3-2)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the ignore list
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Scan
+        id: grype
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: ${{ inputs.image }}
+          severity-cutoff: critical
+          only-fixed: true
+          fail-build: true
+          output-format: json
+          output-file: grype.json
+          grype-version: v0.121.0
+          cache-db: false
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: grype
+          path: grype.json
+          if-no-files-found: ignore
+
+      - name: Print the findings
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -s grype.json ]; then echo "aucun rapport produit"; exit 0; fi
+          python3 - grype.json <<'FIN_PYTHON'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          for m in d.get("matches") or []:
+              v = m.get("vulnerability") or {}
+              a = m.get("artifact") or {}
+              print("  %-9s %-30s %-20s fix=%s" % (
+                  v.get("severity"), a.get("name"), v.get("id"),
+                  ",".join((v.get("fix") or {}).get("versions") or [])))
+          FIN_PYTHON
