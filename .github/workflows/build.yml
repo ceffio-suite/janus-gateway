@@ -130,13 +130,28 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Compute the image reference
+        # LE TAG D'IMAGE N'EST PAS LE TAG GIT : metadata-action retire le "v"
+        # (v1.4.3-2 → 1.4.3-2). Scanner github.ref_name cherchait v1.4.3-2, que le
+        # registre ne connaît pas — "manifest unknown", et le job accusait
+        # l'image au lieu de son nom.
+        id: reference
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+            echo "image=ghcr.io/ceffio-suite/janus-gateway:latest" >> "$GITHUB_OUTPUT"
+          else
+            TAG="$(echo "${GITHUB_REF_NAME}" | sed 's/^v//')"
+            echo "image=ghcr.io/ceffio-suite/janus-gateway:${TAG}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Scan the image
         id: grype
         uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
           # ON A TAG, THAT TAG; ON THE WEEKLY RUN, `latest` — the version an
           # installation pulls today.
-          image: ghcr.io/ceffio-suite/janus-gateway:${{ github.event_name == 'schedule' && 'latest' || github.ref_name }}
+          image: ${{ steps.reference.outputs.image }}
           # THE SAME RULE AS THE REST OF THE SUITE: only a CRITICAL finding WITH a
           # fix stops the job. Everything else is reported.
           severity-cutoff: critical
@@ -146,6 +161,14 @@ jobs:
           output-file: grype-janus.json
           grype-version: v0.121.0
           cache-db: true
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: grype-janus
+          path: grype-janus.json
+          if-no-files-found: ignore
 
       - name: Summarise the scan
         if: always()
@@ -180,4 +203,14 @@ jobs:
           print()
           print("%d vulnérabilité(s) au total, %d avec un correctif."
                 % (sum(c[0] for c in compte.values()), sum(c[1] for c in compte.values())))
+          print()
+          print("Findings with a fix:")
+          for m in matches:
+              v = m.get("vulnerability") or {}
+              if (v.get("fix") or {}).get("state") != "fixed":
+                  continue
+              a = m.get("artifact") or {}
+              print("  %-9s %-32s %-20s fix=%s"
+                    % (v.get("severity"), a.get("name"), v.get("id"),
+                       ",".join((v.get("fix") or {}).get("versions") or [])))
           FIN_PYTHON
